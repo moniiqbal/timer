@@ -2,27 +2,33 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches:
+      - pomodoro-timer
+
+permissions:
+  contents: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      
+          node-version: 20
+
       - name: Install dependencies
-        run: cd pomodoro-timer && npm install
-      
+        working-directory: ./pomodoro-timer
+        run: npm install
+
       - name: Build
-        run: cd pomodoro-timer && npm run build
-      
+        working-directory: ./pomodoro-timer
+        run: npm run build
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
