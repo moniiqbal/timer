@@ -1,0 +1,138 @@
+:root {
+  --bg-deep: #030304;
+  --bg-base: #08080c;
+  --bg-elevated: rgba(12, 14, 20, 0.72);
+
+  --text: rgba(255, 255, 255, 0.72);
+  --text-h: #f4f7ff;
+  --text-muted: rgba(255, 255, 255, 0.45);
+
+  --accent: #22d3ee;
+  --accent-soft: rgba(34, 211, 238, 0.18);
+  --accent-glow: rgba(34, 211, 238, 0.55);
+  --accent-2: #38bdf8;
+
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-strong: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.22);
+  --ring-track: rgba(255, 255, 255, 0.08);
+
+  --shadow-glass:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-glow: 0 0 60px rgba(34, 211, 238, 0.22);
+
+  --sans: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text);
+  background-color: var(--bg-deep);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  min-width: 320px;
+}
+
+body {
+  overflow-x: hidden;
+  background:
+    radial-gradient(
+      ellipse 80% 55% at 12% 18%,
+      rgba(34, 211, 238, 0.2),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 88% 12%,
+      rgba(56, 189, 248, 0.14),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 65% 45% at 72% 88%,
+      rgba(14, 165, 233, 0.12),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 22% 82%,
+      rgba(34, 211, 238, 0.08),
+      transparent 50%
+    ),
+    linear-gradient(165deg, #030304 0%, #08080c 42%, #050508 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100svh;
+  margin: 0;
+  padding: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2 {
+  color: var(--text-h);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-h);
+}
