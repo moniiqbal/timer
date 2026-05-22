@@ -51,7 +51,7 @@ export default function App() {
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [history, setHistory] = useState(readStoredHistory);
-  const [focusCompleteNotice, setFocusCompleteNotice] = useState(false);
+  const [phaseNotice, setPhaseNotice] = useState(null);
 
   const audioContextRef = useRef(null);
 
@@ -85,61 +85,92 @@ export default function App() {
   }, [history]);
 
   useEffect(() => {
-    if (!focusCompleteNotice) return;
+    if (!phaseNotice) return;
 
-    const timeout = setTimeout(() => setFocusCompleteNotice(false), 2600);
+    const timeout = setTimeout(() => setPhaseNotice(null), 4000);
     return () => clearTimeout(timeout);
-  }, [focusCompleteNotice]);
+  }, [phaseNotice]);
 
-  const playSound = useCallback(() => {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const ensureAudioReady = useCallback(async () => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return false;
 
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-      }
-
-      const audioContext = audioContextRef.current;
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(720, audioContext.currentTime);
-
-      gain.gain.setValueAtTime(0.001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.25, audioContext.currentTime + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.45);
-
-      oscillator.connect(gain);
-      gain.connect(audioContext.destination);
-
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.5);
-    } catch {
-      console.log("Audio cue could not be played.");
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
     }
+
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume();
+    }
+
+    return audioContextRef.current.state === "running";
   }, []);
 
-  const handleCycleComplete = useCallback(() => {
-    playSound();
+  const playTone = useCallback((frequency, startAt, duration = 0.35) => {
+    const audioContext = audioContextRef.current;
+    if (!audioContext) return;
 
-    if (mode === "focus") {
-      setFocusCompleteNotice(true);
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
 
-      const completedSession = {
-        id: crypto.randomUUID(),
-        duration: formatTime(focusMinutes * 60),
-        completedAt: formatSessionTime(new Date()),
-      };
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, startAt);
 
-      setHistory((prevHistory) => [completedSession, ...prevHistory]);
-      setMode("break");
-      setSecondsLeft(breakMinutes * 60);
-    } else {
-      setMode("focus");
-      setSecondsLeft(focusMinutes * 60);
+    gain.gain.setValueAtTime(0.001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.45, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration + 0.05);
+  }, []);
+
+  const playPhaseChime = useCallback(
+    async (phase) => {
+      try {
+        const ready = await ensureAudioReady();
+        if (!ready) return;
+
+        const audioContext = audioContextRef.current;
+        const now = audioContext.currentTime;
+
+        if (phase === "focus-done") {
+          playTone(880, now, 0.28);
+          playTone(660, now + 0.32, 0.35);
+          playTone(880, now + 0.72, 0.4);
+        } else {
+          playTone(520, now, 0.5);
+          playTone(390, now + 0.55, 0.55);
+        }
+      } catch {
+        console.log("Audio cue could not be played.");
+      }
+    },
+    [ensureAudioReady, playTone]
+  );
+
+  const showBrowserNotification = useCallback((title, body) => {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
     }
-  }, [mode, focusMinutes, breakMinutes, playSound]);
+
+    try {
+      const notification = new Notification(title, {
+        body,
+        tag: "pomodoro-phase",
+        icon: "/favicon.svg",
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+    } catch {
+      console.log("Browser notification could not be shown.");
+    }
+  }, []);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -150,13 +181,47 @@ export default function App() {
           return prevSeconds - 1;
         }
 
-        handleCycleComplete();
-        return 0;
+        if (mode === "focus") {
+          const completedSession = {
+            id: crypto.randomUUID(),
+            duration: formatTime(focusMinutes * 60),
+            completedAt: formatSessionTime(new Date()),
+          };
+
+          setHistory((prevHistory) => [completedSession, ...prevHistory]);
+          setMode("break");
+
+          const breakMessage =
+            "Focus session complete! Time for a break.";
+          setPhaseNotice({ kind: "focus-done", message: breakMessage });
+          document.title = `Break · ${formatTime(breakMinutes * 60)} — Pomodoro`;
+          playPhaseChime("focus-done");
+          showBrowserNotification("Break time!", breakMessage);
+
+          return breakMinutes * 60;
+        }
+
+        setMode("focus");
+
+        const focusMessage = "Break finished! Back to focus.";
+        setPhaseNotice({ kind: "break-done", message: focusMessage });
+        document.title = `Focus · ${formatTime(focusMinutes * 60)} — Pomodoro`;
+        playPhaseChime("break-done");
+        showBrowserNotification("Focus time", focusMessage);
+
+        return focusMinutes * 60;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isRunning, handleCycleComplete]);
+  }, [
+    isRunning,
+    mode,
+    focusMinutes,
+    breakMinutes,
+    playPhaseChime,
+    showBrowserNotification,
+  ]);
 
   function syncSecondsToDuration(nextFocusMinutes, nextBreakMinutes, nextMode) {
     setSecondsLeft(
@@ -164,14 +229,26 @@ export default function App() {
     );
   }
 
-  function handleStartPause() {
-    setIsRunning((prev) => !prev);
+  async function handleStartPause() {
+    const willStart = !isRunning;
+
+    if (willStart) {
+      await ensureAudioReady();
+
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+
+    setIsRunning(willStart);
   }
 
   function handleReset() {
     setIsRunning(false);
     setMode("focus");
     setSecondsLeft(focusMinutes * 60);
+    setPhaseNotice(null);
+    document.title = "Pomodoro Timer";
   }
 
   function handleFocusChange(event) {
@@ -197,12 +274,21 @@ export default function App() {
   return (
     <main className={`app ${mode}`}>
       <section
-        className={`timer-card${focusCompleteNotice ? " session-complete" : ""}`}
+        className={`timer-card${
+          phaseNotice?.kind === "focus-done" ? " session-complete" : ""
+        }${phaseNotice?.kind === "break-done" ? " session-break-done" : ""}`}
         aria-label="Pomodoro timer"
       >
-        {focusCompleteNotice && (
-          <p className="completion-toast" role="status" aria-live="assertive">
-            ✓ Focus Session Complete
+        {phaseNotice && (
+          <p
+            className={`completion-toast${
+              phaseNotice.kind === "break-done" ? " completion-toast--focus" : ""
+            }`}
+            role="status"
+            aria-live="assertive"
+          >
+            {phaseNotice.kind === "focus-done" ? "✓ " : "→ "}
+            {phaseNotice.message}
           </p>
         )}
 
